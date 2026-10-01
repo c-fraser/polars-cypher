@@ -24,8 +24,7 @@ check: ## check, format, and lint rust code
 		-c c-fraser -l apache -y 2026 polars-cypher/src polars-cypher/tests polars-cypher-cli/src
 
 msrv: ## check that the libraries and CLI build with the declared minimum Rust version
-	$(eval MSRV := $(shell cargo metadata --no-deps --format-version 1 \
-		| jq -r '.packages[0].rust_version'))
+	$(eval MSRV := $(shell cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].rust_version'))
 	rustup toolchain install $(MSRV) --profile minimal --no-self-update
 	cargo +$(MSRV) check --workspace --locked
 

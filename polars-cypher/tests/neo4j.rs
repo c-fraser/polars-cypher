@@ -17,15 +17,16 @@
 use std::collections::HashMap as StdHashMap;
 use std::error::Error;
 use std::path::Path;
-use std::sync::OnceLock;
+use std::sync::{LazyLock, OnceLock};
 use std::time::Duration;
 
-use neo4rs::{ConfigBuilder, Graph as BoltGraph, Query as BoltQuery};
+use neo4rs::{ConfigBuilder, Graph as BoltGraph, Query as BoltQuery, Row};
 use polars::prelude::*;
 use polars_cypher::{BoundParameter, Export, Graph};
 use testcontainers::runners::AsyncRunner;
 use testcontainers::{ContainerAsync, ImageExt, ReuseDirective};
 use testcontainers_modules::neo4j::{Neo4j, Neo4jImage};
+use tokio::runtime::Runtime;
 use tokio::sync::{Mutex as AsyncMutex, MutexGuard};
 
 #[tokio::test(flavor = "multi_thread")]
@@ -130,13 +131,12 @@ async fn parameter() -> Result<(), BoxError> {
     let guard = movies_env().await?;
     let env = guard.as_ref().unwrap();
     let cypher = "MATCH (p:Person) WHERE p.born < $year RETURN count(*) AS value";
-    let mut live_q = BoltQuery::new(cypher.to_string());
-    live_q = live_q.param("year", 1965);
-    let mut stream = env.bolt.execute(live_q).await?;
-    let mut live = Vec::new();
-    while let Some(row) = stream.next().await? {
-        live.push(row.get::<i64>("value")?);
-    }
+    let query = BoltQuery::new(cypher.to_string()).param("year", 1965);
+    let live = bolt_rows(&env.bolt, query)
+        .await?
+        .iter()
+        .map(|row| row.get::<i64>("value"))
+        .collect::<Result<Vec<_>, _>>()?;
     let mut params = StdHashMap::new();
     params.insert("year".to_string(), BoundParameter::Int(1965));
     let local = env.run_local_with_params(cypher, params)?;
@@ -299,19 +299,31 @@ async fn movies_env() -> Result<MutexGuard<'static, Option<TestEnv>>, BoxError> 
     let mutex = MOVIES.get_or_init(|| AsyncMutex::new(None));
     let mut guard = mutex.lock().await;
     if guard.is_none() {
-        *guard = Some(TestEnv::new().await?);
+        *guard = Some(RUNTIME.spawn(TestEnv::new()).await??);
     }
     Ok(guard)
 }
 
-/// Run the `cypher` query on the *Neo4j* instance.
+/// Run `query` on the *Neo4j* instance, on the runtime that owns the pool's connections.
+async fn bolt_rows(bolt: &BoltGraph, query: BoltQuery) -> Result<Vec<Row>, BoxError> {
+    let bolt = bolt.clone();
+    let rows = RUNTIME.spawn(async move {
+        let mut stream = bolt.execute(query).await?;
+        let mut rows = Vec::new();
+        while let Some(row) = stream.next().await? {
+            rows.push(row);
+        }
+        Ok::<_, neo4rs::Error>(rows)
+    });
+    Ok(rows.await??)
+}
+
 async fn bolt_strings(bolt: &BoltGraph, cypher: &str) -> Result<Vec<String>, BoxError> {
-    let mut stream = bolt.execute(BoltQuery::new(cypher.to_string())).await?;
-    let mut out = Vec::new();
-    while let Some(row) = stream.next().await? {
-        out.push(row.get::<String>("value")?);
-    }
-    Ok(out)
+    let rows = bolt_rows(bolt, BoltQuery::new(cypher.to_string())).await?;
+    Ok(rows
+        .iter()
+        .map(|row| row.get::<String>("value"))
+        .collect::<Result<_, _>>()?)
 }
 
 fn sorted<T: Ord + Clone>(v: &[T]) -> Vec<T> {
@@ -332,12 +344,11 @@ fn local_strings(df: &DataFrame, col: &str) -> Vec<String> {
 }
 
 async fn bolt_ints(bolt: &BoltGraph, cypher: &str) -> Result<Vec<i64>, BoxError> {
-    let mut stream = bolt.execute(BoltQuery::new(cypher.to_string())).await?;
-    let mut out = Vec::new();
-    while let Some(row) = stream.next().await? {
-        out.push(row.get::<i64>("value")?);
-    }
-    Ok(out)
+    let rows = bolt_rows(bolt, BoltQuery::new(cypher.to_string())).await?;
+    Ok(rows
+        .iter()
+        .map(|row| row.get::<i64>("value"))
+        .collect::<Result<_, _>>()?)
 }
 
 fn local_ints(df: &DataFrame, col: &str) -> Vec<i64> {
@@ -438,3 +449,7 @@ impl TestEnv {
 }
 
 static MOVIES: OnceLock<AsyncMutex<Option<TestEnv>>> = OnceLock::new();
+
+// each test has its own runtime, which shuts down when the test ends, so the shared container
+// and connection pool live on this one instead
+static RUNTIME: LazyLock<Runtime> = LazyLock::new(|| Runtime::new().unwrap());
