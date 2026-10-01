@@ -1,0 +1,52 @@
+name: release
+on:
+  workflow_dispatch:
+jobs:
+  release:
+    name: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: check code
+        run: make check
+      - name: run tests
+        run: make test
+      - name: check crates
+        run: cargo publish --workspace --dry-run
+      # see https://github.com/goreleaser/example-rust
+      - name: setup zig
+        uses: mlugg/setup-zig@v2
+      - name: setup cosign
+        uses: sigstore/cosign-installer@v4.0.0
+      - name: setup syft
+        uses: anchore/sbom-action/download-syft@v0.22.0
+      - name: check release
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: check
+      # publish first, since crates.io releases are permanent and the GitHub release can be redone
+      - name: publish crates
+        run: cargo publish --workspace
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      - name: create tag
+        run: |
+          VERSION=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[0].version')
+          git tag "v${VERSION}"
+          git push origin "v${VERSION}"
+      - name: run release
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}

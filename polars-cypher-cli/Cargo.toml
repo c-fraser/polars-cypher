@@ -1,0 +1,20 @@
+[package]
+name = "polars-cypher-cli"
+description = "Command-line interface for polars-cypher"
+keywords = ["cypher", "graph", "neo4j", "polars", "cli"]
+categories = ["database", "command-line-utilities"]
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "polars-cypher"
+path = "src/main.rs"
+
+[dependencies]
+polars-cypher = { workspace = true, features = ["neo4j"] }
+clap = { version = "4.5.0", features = ["derive", "env"] }

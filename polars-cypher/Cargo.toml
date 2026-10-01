@@ -1,0 +1,40 @@
+[package]
+name = "polars-cypher"
+description = "Cypher graph query engine built on Polars"
+documentation = "https://docs.rs/polars-cypher"
+keywords = ["cypher", "graph", "neo4j", "polars", "query-engine"]
+categories = ["database"]
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+
+[dependencies]
+polars.workspace = true
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+bincode = { version = "2", default-features = false, features = ["std", "serde"] }
+nom = "8"
+nom_locate = "5"
+neo4rs = { version = "0.8.0", optional = true }
+chrono = { version = "0.4", default-features = false, features = ["alloc"] }
+tokio = { version = "1.49.0", features = ["rt"], optional = true }
+
+[features]
+# export graphs from Neo4j over Bolt with `Export`
+neo4j = ["dep:neo4rs", "dep:tokio"]
+
+[dev-dependencies]
+tokio = { version = "1.49.0", features = ["full"] }
+testcontainers = { version = "0.26.3", features = ["reusable-containers"] }
+testcontainers-modules = { version = "0.14.0", features = ["neo4j"] }
+
+[[test]]
+name = "neo4j"
+required-features = ["neo4j"]
+
+[package.metadata.docs.rs]
+all-features = true

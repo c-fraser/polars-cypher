@@ -1,0 +1,27 @@
+[workspace]
+resolver = "3"
+members = ["polars-cypher", "polars-cypher-cli"]
+
+[workspace.package]
+authors = ["c-fraser <cfraser888@gmail.com>"]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95.0"
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/c-fraser/polars-cypher.git"
+
+[workspace.dependencies]
+polars-cypher = { version = "=0.1.0", path = "polars-cypher" }
+polars = { version = "0.55.2", features = [
+    "lazy",
+    "parquet",
+    "dtype-full",
+    "temporal",
+    "timezones",
+    "strings",
+    "abs",
+    "semi_anti_join",
+    "cross_join",
+    "diagonal_concat",
+] }

@@ -1,0 +1,68 @@
+version: 2
+
+project_name: polars-cypher
+
+before:
+  hooks:
+    - rustup default stable
+    - cargo install --locked cargo-zigbuild
+    - cargo fetch --locked
+
+builds:
+  - builder: rust
+    dir: polars-cypher-cli
+    binary: polars-cypher
+    targets:
+      - x86_64-unknown-linux-gnu
+      - aarch64-unknown-linux-gnu
+
+archives:
+  - formats: [tar.gz]
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+
+changelog:
+  sort: asc
+  groups:
+    - title: Added
+      regexp: '^added:'
+      order: 0
+    - title: Changed
+      regexp: '^changed:'
+      order: 1
+    - title: Fixed
+      regexp: '^fixed:'
+      order: 2
+    - title: Removed
+      regexp: '^removed:'
+      order: 3
+    - title: Other
+      order: 999
+
+nfpms:
+  - file_name_template: "{{ .ConventionalFileName }}"
+    maintainer: c-fraser <cfraser888@gmail.com>
+    formats:
+      - deb
+      - apk
+      - rpm
+
+source:
+  enabled: true
+
+sboms:
+  - artifacts: archive
+
+signs:
+  - cmd: cosign
+    signature: "${artifact}.bundle"
+    args:
+      - sign-blob
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: checksum

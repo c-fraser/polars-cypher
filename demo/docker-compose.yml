@@ -1,0 +1,16 @@
+services:
+  neo4j:
+    image: neo4j:2026-community
+    environment:
+      NEO4J_AUTH: neo4j/password
+    ports:
+      - "7687:7687"
+      - "7474:7474"
+    volumes:
+      - ../polars-cypher/tests/fixtures/movies.cypher:/init.cypher:ro
+    healthcheck:
+      test: cypher-shell -u neo4j -p password -d neo4j 'CALL db.ping()'
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s

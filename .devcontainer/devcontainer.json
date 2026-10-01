@@ -1,0 +1,37 @@
+{
+  "name": "polars-cypher",
+  "image": "mcr.microsoft.com/devcontainers/rust:bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/node:1": {},
+    "ghcr.io/devcontainers-extra/features/zsh-plugins:0": {
+      "plugins": "docker rust"
+    }
+  },
+  "postCreateCommand": {
+    "install docsify": "npm i docsify-cli -g"
+  },
+  "forwardPorts": [
+    3000
+  ],
+  "portsAttributes": {
+    "3000": {
+      "label": "docs site"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "terminal.integrated.profiles.linux": {
+          "zsh": {
+            "path": "/usr/bin/zsh"
+          }
+        },
+        "yaml.schemas": {
+          "https://goreleaser.com/static/schema.json": ".goreleaser.yaml"
+        }
+      }
+    }
+  }
+}
