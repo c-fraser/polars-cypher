@@ -10,8 +10,10 @@ before:
 
 builds:
   - builder: rust
-    dir: polars-cypher-cli
     binary: polars-cypher
+    flags:
+      - --release
+      - --package=polars-cypher-cli
     targets:
       - x86_64-unknown-linux-gnu
       - aarch64-unknown-linux-gnu
